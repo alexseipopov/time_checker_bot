@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  telegram_bot:
+    build: .
+    volumes:
+      - my_data_volume:/app/data
+    # Задайте другие параметры, если необходимо, например, окружение, порт и т.д.
+    # environment:
+    #   - BOT_TOKEN=YOUR_API_TOKEN
+    # ports:
+    #   - "8080:8080"
+
+volumes:
+  my_data_volume:
