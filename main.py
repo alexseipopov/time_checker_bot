@@ -1,12 +1,12 @@
 import logging
-import asyncio
+import asyncpg
 import os
 
 from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.middlewares.logging import LoggingMiddleware
 from aiogram.utils import executor
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Замените 'YOUR_API_TOKEN' на ваш токен API, полученный от BotFather в Telegram.
 API_TOKEN = os.getenv("TOKEN")
@@ -19,45 +19,34 @@ bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 dp.middleware.setup(LoggingMiddleware())
 
-# Путь к базе данных SQLite.
-db_path = 'data.db'
-
-with sqlite3.connect(db_path) as conn:
-    cursor = conn.cursor()
-    cursor.execute('CREATE TABLE IF NOT EXISTS data (user_id INTEGER, date TEXT, number INTEGER)')
-    conn.commit()
+db_connection = os.getenv("DATABASE_URL")
 
 
 # Функция для добавления данных в базу данных.
-def add_data_to_db(user_id, date, number):
-    with sqlite3.connect(db_path) as conn:
-        cursor = conn.cursor()
-        cursor.execute('INSERT INTO data (user_id, date, number) VALUES (?, ?, ?)', (user_id, date, number))
-        conn.commit()
-
-
-# Функция для отправки ежедневного вопроса.
-async def send_daily_question():
-    # Получаем текущую дату и время.
-    current_date = datetime.now().strftime('%Y-%m-%d')
-
-    # Формируем вопрос для отправки.
-    question_text = f"Сколько часов ты сегодня работал? ({current_date}):"
-
-    # Получаем список всех зарегистрированных пользователей.
-    with sqlite3.connect(db_path) as conn:
-        cursor = conn.cursor()
-        cursor.execute('SELECT DISTINCT user_id FROM data')
-        users = cursor.fetchall()
-
-    # Отправляем вопрос каждому пользователю.
-    for user_id in users:
-        await bot.send_message(user_id[0], question_text)
-
+async def add_data_to_db(user_id, date, number):
+    try:
+        pool = await asyncpg.create_pool(db_connection)
+        async with pool.acquire() as connection:
+            await connection.execute(f'''
+                INSERT INTO data (user_id, date, number) VALUES ({user_id}, '{date}', {number})
+            ''')
+        logging.info(f"User {user_id} added data to database.")
+    except Exception as e:
+        logging.exception(e)
 
 # Обработчик команды /start.
 @dp.message_handler(commands=['start'])
 async def cmd_start(message: types.Message):
+    try:
+        session = await asyncpg.create_pool(db_connection)
+        async with session.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(f'''
+                    INSERT INTO users (user_id) VALUES ({message.from_user.id})
+                ''')
+            logging.info(f"User added data to database.")
+    except Exception as e:
+        logging.exception(e)
     await message.answer("Привет! Я буду присылать тебе опросы о потраченном времени!")
 
 
@@ -72,7 +61,7 @@ async def handle_text(message: types.Message):
         current_date = datetime.now().strftime('%Y-%m-%d')
 
         # Сохраняем данные в базе данных.
-        add_data_to_db(message.from_user.id, current_date, number)
+        await add_data_to_db(message.from_user.id, current_date, number)
 
         await message.answer("Спасибо! Твой ответ был сохранен.")
     except ValueError:
@@ -80,19 +69,6 @@ async def handle_text(message: types.Message):
         await message.answer("Пожалуйста, введи число!")
 
 
-# Цикл для отправки ежедневного вопроса.
-async def daily_question_loop():
-    while True:
-        # Отправляем вопрос.
-        await send_daily_question()
-
-        # Ждем 24 часа перед следующей отправкой вопроса.
-        await asyncio.sleep(24 * 60 * 60)
-
 if __name__ == '__main__':
-    # Запускаем цикл для отправки ежедневного вопроса.
-    loop = asyncio.get_event_loop()
-    loop.create_task(daily_question_loop())
-
     # Запускаем бота.
     executor.start_polling(dp, skip_updates=True)

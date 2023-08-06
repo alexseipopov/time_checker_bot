@@ -16,5 +16,5 @@ COPY . .
 VOLUME /app/data
 
 # Запускаем бота
-CMD ["python", "bot.py"]
+CMD ["python3", "main.py"]
 

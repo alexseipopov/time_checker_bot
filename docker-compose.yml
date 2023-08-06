@@ -1,15 +1,24 @@
-version: '3'
+version: '3.8'
 
 services:
+  tg_timecheck_db:
+    container_name: tg_timecheck_db
+    ports:
+      - 5416:5432
+    image: postgres:latest
+    volumes:
+      - my_data_volume:/var/lib/postgresql/data
+    env_file:
+      - .env
   telegram_bot:
+    container_name: telegram_bot
+    depends_on:
+      - tg_timecheck_db
     build: .
     volumes:
       - my_data_volume:/app/data
-    # Задайте другие параметры, если необходимо, например, окружение, порт и т.д.
-    # environment:
-    #   - BOT_TOKEN=YOUR_API_TOKEN
-    # ports:
-    #   - "8080:8080"
+    env_file:
+      - .env
 
 volumes:
   my_data_volume:
