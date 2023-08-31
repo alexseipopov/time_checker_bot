@@ -66,3 +66,24 @@ async def close_period(tg_id):
     except Exception as e:
         logging.exception(e)
 
+
+async def insert_new_user(tg_id):
+    logging.info(f"User {tg_id} try add to database.")
+    try:
+        pool = await asyncpg.create_pool(db_connection)
+        async with pool.acquire() as connection:
+            user_id = await connection.fetch(f'''
+                SELECT id FROM users WHERE user_id = {tg_id})
+            ''')
+            if not user_id:
+                await connection.execute(f'''
+                    INSERT INTO users (user_id) VALUES ({tg_id})
+                ''')
+                logging.info(f"User {tg_id} added to database.")
+                return True
+            else:
+                logging.info(f"User {tg_id} already exists in database.")
+                return False
+    except Exception as e:
+        logging.exception(e)
+        return False
