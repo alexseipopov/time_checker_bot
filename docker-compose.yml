@@ -15,8 +15,6 @@ services:
     depends_on:
       - tg_timecheck_db
     build: .
-    volumes:
-      - my_data_volume:/app/data
     env_file:
       - .env
 
