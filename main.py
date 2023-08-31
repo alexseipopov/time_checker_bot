@@ -19,10 +19,10 @@ bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 dp.middleware.setup(LoggingMiddleware())
 
-db_connection = os.getenv("DATABASE_URL")
 
 
-# Функция для добавления данных в базу данных.
+
+
 async def add_data_to_db(user_id, date, number):
     try:
         pool = await asyncpg.create_pool(db_connection)
